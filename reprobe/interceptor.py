@@ -1,3 +1,8 @@
+from typing import Literal
+import torch
+from .hook import Hook
+
+
 class Interceptor(Hook):
     def __init__(self, model, start_layer: int = 0, end_layer: int = None, training_mode: Literal["prefill", "token"] = "token"):
         super().__init__(model)
