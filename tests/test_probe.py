@@ -3,7 +3,7 @@ import tempfile, os
 from reprobe import Probe
 
 def test_probe_save_and_load():
-    # On crée une probe bidon
+    # Mock probe
     probe = Probe(hidden_dim=16, concepts=["toxicity"], layer=5, model_id="test", training_mode="prefill")
     probe.mean_act = torch.zeros(16)
     probe.std_act = torch.ones(16)

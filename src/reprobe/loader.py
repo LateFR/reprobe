@@ -38,6 +38,8 @@ class ProbeLoader:
         content = torch.load(path)
         probes = {}
         for key, data in content.items():
+            if not str(key).isdigit(): # skip global keys
+                continue
             probe = Probe.load(
                 data["state_dict"],
                 mean_act=data["mean_act"],
