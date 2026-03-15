@@ -19,10 +19,9 @@ class ProbeLoader:
         
         dir = os.path.dirname(path)
         probes = {}
-        for key, meta in registry.items():
-            if not key.isdigit(): # skip global keys
-                continue
-            
+        training_mode = registry["training_mode"]
+        
+        for key, meta in registry["probes"][training_mode].items():
             probe_path = os.path.join(dir, meta["filename"])
             probe = Probe.load_from_file(probe_path)
             probes[probe.meta["layer"]] = probe
@@ -37,9 +36,8 @@ class ProbeLoader:
         """
         content = torch.load(path)
         probes = {}
-        for key, data in content.items():
-            if not str(key).isdigit(): # skip global keys
-                continue
+        training_mode = content["training_mode"]
+        for key, data in content["probes"][training_mode].items():
             probe = Probe.load(
                 data["state_dict"],
                 mean_act=data["mean_act"],

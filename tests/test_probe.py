@@ -13,6 +13,7 @@ def test_probe_save_and_load():
         path = f.name
 
     try:
+        probe.training_mode = "prefill"
         probe.save(path)
         loaded = Probe.load_from_file(path)
 

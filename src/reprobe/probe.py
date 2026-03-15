@@ -21,6 +21,8 @@ class ProbesTrainer():
         
         self.num_layers: int = None
         self.layer_offset: int = None  
+        
+        self.training_mode = None
 
     def set_optim(self, optim, **kwargs):
         self.optim = optim
@@ -102,6 +104,7 @@ class ProbesTrainer():
         show_tqdm: bool = False,
         show_stats: bool = True
     ):
+        self.training_mode = training_mode
         y = (labels > 0.5).float().unsqueeze(1) # from probability to bool
         
         num_layers = acts.shape[1]
@@ -134,18 +137,29 @@ class ProbesTrainer():
                 tqdm.tqdm.write(f"Layer {real_layer} | ROC-AUC: {acc:.3f}")
     
     def save(self, dir: str, one_file: bool = False):
+        if not self.training_mode:
+            raise RuntimeError('Please call "train_probes" before save.')
         os.makedirs(dir, exist_ok=True)
-        registry = {"model": self.model_id, "num_layers": self.num_layers, "layer_offset": self.layer_offset}
+        registry = {
+            "model": self.model_id,
+            "num_layers": self.num_layers,
+            "layer_offset": self.layer_offset,
+            "training_mode": self.training_mode,
+            "probes": {
+                "prefill": {},
+                "token": {}
+            }
+            }
         if not one_file:
             for layer, probe in self.probes.items():
                 filename = f"layer_{layer}.pt"
                 probe.save(os.path.join(dir, filename))
-                registry[layer] = {**probe.meta, "filename": filename}
+                registry["probes"][self.training_mode][layer] = {**probe.meta, "filename": filename}
             with open(os.path.join(dir, "registry.json"), "w") as f:
                 json.dump(registry, f, indent=2)
         else:
             for layer, probe in self.probes.items():
-                registry[layer] = probe._to_save()
+                registry["probes"][self.training_mode][layer] = probe._to_save()
             torch.save(registry, os.path.join(dir, f"{self.model_id}_probes.pt"))
         
 class Probe(nn.Module):
