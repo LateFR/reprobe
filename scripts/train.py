@@ -118,7 +118,7 @@ if "__main__" == __name__:
                 with torch.no_grad():
                     #outputs_ids = model.generate(**inputs, max_new_tokens=100, do_sample=False)
                     model(**inputs)
-                interceptor._flush(block_capture=True)
+                #interceptor._flush(block_capture=True)
                 #prompt_len = inputs["input_ids"].shape[1]
                 #response_ids = outputs_ids[:, prompt_len:]
                 #texts = tokenizer.batch_decode(response_ids, skip_special_tokens=True)
@@ -146,7 +146,7 @@ if "__main__" == __name__:
     
     
     
-    acts_tensor = torch.cat(interceptor.activations, dim=0)
+    acts_tensor = interceptor.finalize()[mode]
     labels_tensor = torch.cat(labels)
     
     
