@@ -42,7 +42,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     LAYERS_TO_STEER = [12, 13, 14, 15, 16]
-    ALPHA = 0.5
+    ALPHA = 0.7
     MAX_NEW_TOKENS = 150
 
     PROMPTS = [

@@ -75,7 +75,7 @@ class Monitor(Hook):
             for step in self.history
         ])
         
-        all_probs_cpu = all_probs.cpu().numpy()
+        all_probs_cpu = all_probs.float().cpu().numpy()
         
         res = []
         for step_idx in range(all_probs_cpu.shape[0]):
