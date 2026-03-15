@@ -38,7 +38,7 @@ if __name__ == "__main__":
         config = tomllib.load(f)
 
     model_id = config["model"]["name"]
-    probe_dir = "outputs/v2/prefill/probes/registry.json"
+    probe_dir = "outputs/v3/prefill/probes/registry.json"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     LAYERS_TO_STEER = [12, 13, 14, 15, 16]
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     monitor = ProbeLoader.monitor(model, probe_dir, filter=lambda meta: meta["layer"] in LAYERS_TO_STEER)
     results = []
 
-    steerer_token = ProbeLoader.steerer(model, f"outputs/v2/probes/registry.json", alpha = 1.0 , filter=lambda meta: meta["layer"] in LAYERS_TO_STEER)
+    steerer_token = ProbeLoader.steerer(model, f"outputs/v3/token/probes/registry.json", alpha = 1.0 , filter=lambda meta: meta["layer"] in LAYERS_TO_STEER)
     os.makedirs("plots", exist_ok=True)
 
     for i, prompt in enumerate(tqdm(PROMPTS, desc="Benchmarking & Plotting")):
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         monitor.attach()
         text_base = generate(model, tokenizer, inputs, MAX_NEW_TOKENS)
         # On récupère la trajectoire (moyenne des couches par token)
-        history_base = [sum(step.values())/len(step) for step in monitor.claim_results(flush_buffer=False)]
+        history_base = [sum(step.values())/len(step) for step in monitor.get_history(flush_buffer=False)]
         score_base_ext = score(detox, text_base)
         score_base_int = monitor.score()
         monitor.detach()
@@ -95,7 +95,7 @@ if __name__ == "__main__":
         steerer_token.attach()
         monitor.attach()
         text_steered = generate(model, tokenizer, inputs, MAX_NEW_TOKENS)
-        history_steered = [sum(step.values())/len(step) for step in monitor.claim_results(flush_buffer=False)]
+        history_steered = [sum(step.values())/len(step) for step in monitor.get_history(flush_buffer=False)]
         score_steered_ext = score(detox, text_steered)
         score_steered_int = monitor.score() 
         steerer_token.detach()

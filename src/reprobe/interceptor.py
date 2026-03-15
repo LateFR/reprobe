@@ -36,8 +36,8 @@ class Interceptor(Hook):
                     self._flush()
                     return   
                 
-            # <Capture last token
-            self._acts_buffer[layer_idx] = hidden_states[:, -1, :].detach().cpu()
+            # Capture last token
+            self._acts_buffer[layer_idx] = hidden_states[:, -1, :].detach() # stay on gpu
             
             # Si on a atteint la dernière couche, on range ça dans les activations finales
             if len(self._acts_buffer) == (self.end_layer - self.start_layer):
@@ -56,10 +56,10 @@ class Interceptor(Hook):
             acts = [self._acts_buffer[l] for l in sorted_layers]
             
             stacked = torch.stack(acts, dim=0)  # [num_layers, batch, hidden_dim]
-            stacked = stacked.permute(1, 0, 2)   # [batch, num_layers, hidden_dim]
+            stacked_cpu = stacked.permute(1, 0, 2).cpu()   # [batch, num_layers, hidden_dim] cpu
             
-            for i in range(stacked.shape[0]):
-                self.activations.append(stacked[i].unsqueeze(0)) #[1, num_layers, hidden_dim]
+            for i in range(stacked_cpu.shape[0]):
+                self.activations.append(stacked_cpu[i].unsqueeze(0)) #[1, num_layers, hidden_dim]
             
             self._acts_buffer = {}
             if block_capture:

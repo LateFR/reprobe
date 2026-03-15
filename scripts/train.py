@@ -7,8 +7,7 @@ import argparse
 import logging
 import tomllib
 from detoxify import Detoxify
-from scripts.compute_probs import ProbesTrainer
-from scripts.generate_dataset import Interceptor, Classifier
+from reprobe import ProbesTrainer, Interceptor, Classifier
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s][%(levelname)s] %(message)s",
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 if "__main__" == __name__:
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("--config", "-c", help="Config path", default="config.toml")
+    parser.add_argument("--config", "-c", help="Config path", default="scripts/config.toml")
     
     args = parser.parse_args()
     

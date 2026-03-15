@@ -90,6 +90,6 @@ class ProbeLoader:
         elif isinstance(alpha, dict):
             probe_list = [(p, alpha.get(layer, 20.0)) for layer, p in probes.items()]
         else:
-            probe_list = list(probes.values())
+            probe_list = list(probes.values()) #Steerer will automatically add alpha
             
         return Steerer(model, probe_list, mode=mode, alpha=alpha) #alpha will be automatically ignored in the 2 first case

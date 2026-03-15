@@ -3,7 +3,7 @@ dataset = "PKU-Alignment/BeaverTails"
 
 [training]
 device = "auto"
-mode = "prefill"
+mode = "token"
 
 [model]
 name = "Qwen/Qwen2.5-1.5B"
@@ -16,4 +16,4 @@ batch_size = 64
 num_samples = 5000 # 250 safe + 250 unsafe = 500 total (idéal pour un premier test rapide)
 
 [output]
-output_dir = "outputs/v2/prefill/"
+output_dir = "outputs/v3/token/"

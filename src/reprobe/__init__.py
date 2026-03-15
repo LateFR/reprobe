@@ -4,6 +4,7 @@ from .interceptor import Interceptor
 from .monitor import Monitor
 from .steerer import Steerer
 from .loader import ProbeLoader
+from .dataset import Classifier
 __version__ = "0.1.0"
 __all__ = [
     "Hook",
@@ -12,5 +13,6 @@ __all__ = [
     "ProbeLoader",
     "Interceptor",
     "Monitor",
-    "Steerer"
+    "Steerer",
+    "Classifier"
 ]

@@ -65,7 +65,7 @@ class Listener(Hook):
             self.history.append(self._current_step_data)
             self._current_step_data = {}
             
-    def claim_results(self, flush_buffer = True):
+    def get_history(self, flush_buffer = True):
         res = self.history.copy()
         
         if flush_buffer:

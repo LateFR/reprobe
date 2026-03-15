@@ -30,9 +30,9 @@ class Steerer(Hook):
             hidden = output[0] if isinstance(output, tuple) else output
             
             if self.mode == "projected":
-                hidden = self._apply_projection(hidden, direction, alpha)
+                hidden = Steerer._apply_projection(hidden, direction, alpha)
             else:
-                hidden = self._apply_uniform(hidden, direction, alpha)
+                hidden = Steerer._apply_uniform(hidden, direction, alpha)
             
             if isinstance(output, tuple):
                 return (hidden,) + output[1:]

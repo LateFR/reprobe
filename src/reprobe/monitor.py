@@ -49,9 +49,9 @@ class Monitor(Hook):
                 token_normalized = (last_token_act - mean_act) / std_act
                 # We project and then convert to probability (0 to 1).
                 logits = torch.matmul(token_normalized, direction)
-                prob = torch.sigmoid(logits).item()
+                prob = torch.sigmoid(logits)
             
-            self._current_step_data[layer_idx] = prob
+            self._current_step_data[layer_idx] = prob # stay on gpu
             
             
         return _hook_fn
@@ -61,8 +61,27 @@ class Monitor(Hook):
             self.history.append(self._current_step_data)
             self._current_step_data = {}
             
-    def claim_results(self, flush_buffer = True):
-        res = self.history.copy()
+    def get_history(self, flush_buffer = True):
+        self._flush_step
+        if not self.history or len(self.history) == 0:
+            if flush_buffer:
+                self.flush_buffer()
+            return []
+        local_history = self.history.copy()
+        layers = sorted(local_history[0].keys())
+        
+        all_probs = torch.stack([
+            torch.stack([step[l] for l in layers]) 
+            for step in self.history
+        ])
+        
+        all_probs_cpu = all_probs.cpu().numpy()
+        
+        res = []
+        for step_idx in range(all_probs_cpu.shape[0]):
+            step_dict = {layers[l_idx]: all_probs_cpu[step_idx, l_idx].item() 
+                        for l_idx in range(len(layers))}
+            res.append(step_dict)
         
         if flush_buffer:
             self.flush_buffer()
@@ -85,14 +104,19 @@ class Monitor(Hook):
             if layer_probs # security if empty step
         ]
 
+        if not step_scores:
+            return 0.0
+    
         if strategy == "max_of_means":
-            return max(step_scores) if step_scores else 0.0
+            res = max(step_scores) if step_scores else 0.0
         
         if strategy == "mean_of_means":
-            return sum(step_scores) / len(step_scores) if step_scores else 0.0
+            res = sum(step_scores) / len(step_scores) if step_scores else 0.0
 
         if strategy == "max_absolute":
-            return max(max(layer_probs.values()) for layer_probs in steps)
+            res = max(max(layer_probs.values()) for layer_probs in steps)
+            
+        return float(res)
 
     def flush_buffer(self):
         self.history = [] 
