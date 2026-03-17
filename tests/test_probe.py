@@ -35,3 +35,5 @@ def test_probe_get_direction_guard_zero_norm():
     d = probe.get_direction()
     assert torch.isfinite(d).all(), "get_direction must not return NaN"
     assert d.shape[0] == 4
+    
+# TODO: make a test for trainer.save(dir, merge=True)

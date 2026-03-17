@@ -19,9 +19,11 @@ def test_probe_and_load_abstractor():
     acts = torch.full((size, 3, hidden_dim), 4).float()
     labels = torch.cat([torch.ones(int(size/2)), torch.zeros(int(size/2))])
     
+    mode = "prefill"
     model_id = "test"
     trainer = ProbesTrainer(model_id, hidden_dim)
-    trainer.train_probes(acts, labels, ["test"],  epochs=1)
+    
+    trainer.train_probes(acts, labels, ["test"],  epochs=1, training_mode=mode)
     probes = trainer.probes
     with tempfile.TemporaryDirectory() as tmpdir:
         
@@ -30,7 +32,7 @@ def test_probe_and_load_abstractor():
         loaded = ProbeLoader.from_file(os.path.join(tmpdir, f"{model_id}_probes.pt"))
         for layer in probes:
             orig = probes[layer]
-            new = loaded[layer]
+            new = loaded[mode][layer]
             compare_probes(orig, new)
         
         trainer.save(tmpdir)
@@ -38,6 +40,6 @@ def test_probe_and_load_abstractor():
         loaded = ProbeLoader.from_registry(os.path.join(tmpdir, "registry.json"))
         for layer in probes:
             orig = probes[layer]
-            new = loaded[layer]
+            new = loaded[mode][layer]
             compare_probes(orig, new)
     

@@ -1,3 +1,4 @@
+import logging
 from .steerer import Steerer
 from .monitor import Monitor
 from .probe import Probe
@@ -7,6 +8,7 @@ import json
 import os
 import torch
 
+logger = logging.getLogger(__name__)
 class ProbeLoader:
     @staticmethod
     def from_registry(path: str) -> dict[int, Probe]:
@@ -18,13 +20,24 @@ class ProbeLoader:
             registry = json.load(f)
         
         dir = os.path.dirname(path)
-        probes = {}
+        probes = {
+            "prefill": {},
+            "token": {}
+        }
         training_mode = registry["training_mode"]
+        if not training_mode or training_mode not in ["prefill", "token", "all"]:
+                raise ValueError(f"Registry has an invalid mode: {training_mode}. Must be between 'token', 'prefill' and 'all'")
+                
+        items = registry["probes"][training_mode].items() if training_mode != "all" else registry["probes"]["prefill"].items() + registry["probes"]["token"].items() 
         
-        for key, meta in registry["probes"][training_mode].items():
+        for key, meta in items:
             probe_path = os.path.join(dir, meta["filename"])
             probe = Probe.load_from_file(probe_path)
-            probes[probe.meta["layer"]] = probe
+            mode = probe.meta["training_mode"]
+            if not mode or mode not in ["prefill", "token"]:
+                logger.warning(f"Probe layer {probe.meta["layer"]} of {probe.meta["model_id"]} has an invalid mode: {mode}. Must be between 'token' and 'prefill'. Skipped")
+                continue
+            probes[mode][probe.meta["layer"]] = probe
             
         return probes
     
@@ -35,7 +48,10 @@ class ProbeLoader:
         Return {layer: Probe}
         """
         content = torch.load(path)
-        probes = {}
+        probes = {
+            "prefill": {},
+            "token": {}
+        }
         training_mode = content["training_mode"]
         for key, data in content["probes"][training_mode].items():
             probe = Probe.load(
@@ -44,7 +60,11 @@ class ProbeLoader:
                 std_act=data["std_act"],
                 **data["meta"]
             )
-            probes[probe.meta["layer"]] = probe
+            mode = probe.meta["training_mode"]
+            if not mode or mode not in ["prefill", "token"]:
+                logger.warning(f"Probe layer {probe.meta["layer"]} of {probe.meta["model_id"]} has an invalid mode: {mode}. Must be between 'token' and 'prefill'. Skipped")
+                continue
+            probes[mode][probe.meta["layer"]] = probe
             
         return probes
     
@@ -59,7 +79,7 @@ class ProbeLoader:
             return ProbeLoader.from_registry(path)
 
         raise ValueError(f"Unsupported file type: {path}")
-    
+
     
     @staticmethod
     def monitor(
