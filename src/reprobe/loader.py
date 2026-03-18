@@ -117,6 +117,20 @@ class ProbeLoader:
         mode: Literal["prefill", "token", "all", "auto"] = "auto",
         filter: Callable[[dict], bool] = None
     ):
+        """
+    Create a Monitor from a probe file.
+
+    Args:
+        model: The transformer model to attach hooks to.
+        path: Path to a registry.json or .pt probe file.
+        mode: Which probes to load.
+            - "prefill": only prefill probes (raises if none found)
+            - "token": only token probes (raises if none found)
+            - "all": both prefill and token (raises if either is missing)
+            - "auto": all available probes, no validation on mode coverage
+        filter: Optional callable receiving probe meta dict, returns True to keep the probe.
+            Example: filter=lambda meta: meta["layer"] in [12, 13, 14]
+    """
         probes = ProbeLoader.load(path)
         probes = ProbeLoader._check_mode(mode, probes, return_flatten_probes=True)
         if filter:
@@ -133,6 +147,25 @@ class ProbeLoader:
         alpha: float | dict[int, float] | dict[str, float] | Callable[[dict], float] = 1.0,
         filter: Callable[[dict], bool] = None,
     ):
+        """
+        Create a Steerer from a probe file.
+
+        Args:
+            model: The transformer model to attach hooks to.
+            path: Path to a registry.json or .pt probe file.
+            mode: Which probes to load. See ProbeLoader.monitor() for details.
+            steering_mode: Steering projection method.
+                - "projected": subtracts only the component along the probe direction (recommended)
+                - "uniform": subtracts the full direction vector scaled by alpha
+            alpha: Steering strength. Accepts:
+                - float: same alpha for all probes
+                - dict[int, float]: per-layer alpha, e.g. {12: 0.5, 13: 1.0}
+                - dict[str, float]: per-mode alpha, e.g. {"prefill": 0.7, "token": 1.0}
+                - Callable[[dict], float]: receives probe meta, returns alpha.
+                Covers any combination: lambda meta: 0.7 if meta["training_mode"] == "prefill" else 1.0
+            filter: Optional callable receiving probe meta dict, returns True to keep the probe.
+                Example: filter=lambda meta: meta["layer"] in [12, 13, 14]
+        """
         probes = ProbeLoader.load(path)
         probes = ProbeLoader._check_mode(mode, probes, return_flatten_probes=True)
         if filter:
