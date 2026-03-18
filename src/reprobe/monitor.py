@@ -7,7 +7,6 @@ class Monitor(Hook):
     def __init__(self, model, probes: list[Probe]):
         super().__init__(model)
         self.probes = {p.meta["layer"]: p for p in probes}
-        print(self.probes.keys())
         self.model = model
         self._current_step_data = {}
         self.history = []

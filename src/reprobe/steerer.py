@@ -47,6 +47,7 @@ class Steerer(Hook):
             return hidden
         return _hook_fn
 
+    @staticmethod
     def _apply_projection(hidden, direction, alpha):
         # Scalair product
         # (batch, seq, dim) @ (dim,) -> (batch, seq)
@@ -58,6 +59,7 @@ class Steerer(Hook):
         hidden = hidden - alpha * projection
         return hidden
     
+    @staticmethod
     def _apply_uniform(hidden, direction, alpha):
         return hidden - alpha * direction
     

@@ -1,4 +1,3 @@
-from cProfile import label
 import json
 import os
 from typing import Literal
@@ -14,7 +13,7 @@ class ProbesTrainer():
     def __init__(self, model_id: str, hidden_dim: int, device: torch.device = "cpu"):
         self.model_id = model_id
         self.hidden_dim = hidden_dim
-        self.probes: dict[str, int, Probe] = {"prefill": {}, "token": {}}
+        self.probes: dict[str, dict[int, Probe]] = {"prefill": {}, "token": {}}
         self.device = device
         
         # defaults, overridables
