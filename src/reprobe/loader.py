@@ -115,7 +115,8 @@ class ProbeLoader:
         model, 
         path: str,
         mode: Literal["prefill", "token", "all", "auto"] = "auto",
-        filter: Callable[[dict], bool] = None
+        filter: Callable[[dict], bool] = None,
+        _layers_path: str | None = None
     ):
         """
     Create a Monitor from a probe file.
@@ -136,7 +137,7 @@ class ProbeLoader:
         if filter:
             probes = [p for p in probes if filter(p.meta)]
         
-        return Monitor(model, probes)
+        return Monitor(model, probes, _layers_path = _layers_path)
     
     @staticmethod
     def steerer(
@@ -146,6 +147,7 @@ class ProbeLoader:
         steering_mode: Literal['projected', 'uniform'] = "projected",
         alpha: float | dict[int, float] | dict[str, float] | Callable[[dict], float] = 1.0,
         filter: Callable[[dict], bool] = None,
+        _layers_path: str | None = None
     ):
         """
         Create a Steerer from a probe file.
@@ -184,6 +186,6 @@ class ProbeLoader:
         else:
             probe_list = probes #Steerer will automatically add alpha
             
-        return Steerer(model, probe_list, mode=steering_mode, alpha=alpha) #alpha will be automatically ignored in the 2 first case
+        return Steerer(model, probe_list, mode=steering_mode, alpha=alpha, _layers_path = _layers_path) #alpha will be automatically ignored in the 2 first case
     
     

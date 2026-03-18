@@ -9,9 +9,10 @@ class Steerer(Hook):
             model,
             probes: list,
             mode: Literal["projected", "uniform"] = "projected",
-            alpha: float = 1
-        ):
-        super().__init__(model)
+            alpha: float = 1,
+            _layers_path: str | None = None
+    ):
+        super().__init__(model, _layers_path)
         self.probes: list[tuple[Probe, float]] = [
             (p, alpha) if isinstance(p, Probe) else (p[0], p[1])
             for p in probes

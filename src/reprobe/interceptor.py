@@ -4,8 +4,15 @@ from .hook import Hook
 
 
 class Interceptor(Hook):
-    def __init__(self, model, start_layer: int = 0, end_layer: int = None, training_mode: Literal["prefill", "token", "all"] = "prefill"):
-        super().__init__(model)
+    def __init__(
+        self, 
+        model,
+        start_layer: int = 0, 
+        end_layer: int = None, 
+        training_mode: Literal["prefill", "token", "all"] = "prefill",
+        _layers_path: str | None = None
+    ):
+        super().__init__(model, _layers_path)
         
         self.training_mode = training_mode
         self._activations = {
@@ -16,7 +23,8 @@ class Interceptor(Hook):
         self._acts_buffer = {} # Utilisation d'un dict pour garantir l'ordre des layers
         
         self.start_layer = start_layer
-        self.end_layer = end_layer if end_layer is not None else len(model.model.layers)
+        
+        self._end_layer_arg = end_layer
         
     def _get_layers_to_hook(self):
         # None because we don't need special data
@@ -71,6 +79,11 @@ class Interceptor(Hook):
             if block_capture:
                 self._capture_next = False
     
+    def attach(self):
+        self._resolve_layers_if_none()
+        if self._end_layer_arg is None:
+            self.end_layer = len(self._layers)
+        return super().attach()
     
     def finalize(self, reset=True):
         if self.training_mode in ("token", "all"):

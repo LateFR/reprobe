@@ -4,8 +4,8 @@ from .probe import Probe
 from .hook import Hook
 
 class Monitor(Hook):
-    def __init__(self, model, probes: list[Probe]):
-        super().__init__(model)
+    def __init__(self, model, probes: list[Probe], _layers_path: str | None = None):
+        super().__init__(model, _layers_path)
         self.probes = {p.meta["layer"]: p for p in probes}
         self.model = model
         self._current_step_data = {}
