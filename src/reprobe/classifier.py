@@ -21,22 +21,3 @@ class Classifier():
         results = self.normalize_output(out) if (self.normalize_output) else out
         
         return results
-    
-class DatasetConfig(TypedDict):
-    type: Literal["huggingface", "json"]
-    name: str
-    fn_data: Callable
-    params: dict
-    
-class DataManager():
-    def __init__(self, datasets: list[DatasetConfig]):
-        self.datasets = datasets
-        
-    def load(self):
-        datas = []
-        for dataset in self.datasets:
-            cfg = dataset.copy()
-            fn = cfg.pop("fn_data")
-            if cfg["type"] == "huggingface":
-                ds = load_dataset(cfg.pop("name"), **cfg["params"])
-                datas.append(fn(ds))
