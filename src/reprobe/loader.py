@@ -68,17 +68,33 @@ class ProbeLoader:
         return probes
     
     @staticmethod
-    def load(path: str) -> dict[int, Probe]:
+    def load(path: str, **hf_kwargs) -> dict[int, Probe]:
         path = Path(path)
 
-        if path.suffix == ".pt":
-            return ProbeLoader.from_file(path)
+        if path.exists():
+            if path.suffix == ".pt":
+                return ProbeLoader.from_file(path)
 
-        if path.suffix == ".json":
-            return ProbeLoader.from_registry(path)
+            if path.suffix == ".json":
+                return ProbeLoader.from_registry(path)
 
-        raise ValueError(f"Unsupported file type: {path}")
+            raise ValueError(f"Unsupported file type: {path}")
 
+        try:
+            from huggingface_hub import hf_hub_download, list_repo_files
+        except ImportError:
+            raise ImportError(
+                f"Path '{path}' not found locally. "
+                "To load from HuggingFace, install huggingface_hub: pip install huggingface_hub"
+            )
+        
+        files = [f for f in list_repo_files(path) if f.endswith(".pt")]
+        if not files:
+            raise ValueError(f"No .pt file found in HuggingFace repo '{path}'.")
+        
+        path = hf_hub_download(path, fliename=files[0], **hf_kwargs)
+        
+        return ProbeLoader.load(path)
     @staticmethod
     def _check_mode(
         mode: Literal["prefill", "token", "all", "auto"],
@@ -116,14 +132,15 @@ class ProbeLoader:
         path: str,
         mode: Literal["prefill", "token", "all", "auto"] = "auto",
         filter: Callable[[dict], bool] = None,
-        _layers_path: str | None = None
+        _layers_path: str | None = None,
+        **hf_kwargs,
     ):
         """
     Create a Monitor from a probe file.
 
     Args:
         model: The transformer model to attach hooks to.
-        path: Path to a registry.json or .pt probe file.
+        path: Path to a registry.json, a .pt probe file or a hugging face repository
         mode: Which probes to load.
             - "prefill": only prefill probes (raises if none found)
             - "token": only token probes (raises if none found)
@@ -131,8 +148,13 @@ class ProbeLoader:
             - "auto": all available probes, no validation on mode coverage
         filter: Optional callable receiving probe meta dict, returns True to keep the probe.
             Example: filter=lambda meta: meta["layer"] in [12, 13, 14]
+        _layers_path: Optional path to the transformer layers attribute, e.g. "model.layers".
+                      Only needed for non-standard architectures not auto-detected by reprobe.
+                      Example: _layers_path="custom.transformer.blocks"
+        **hg_kwargs: Extra arguments passed to hf_hub_download (e.g. token, revision, cache_dir).
+                     Only used when loading from HuggingFace Hub
     """
-        probes = ProbeLoader.load(path)
+        probes = ProbeLoader.load(path, **hf_kwargs)
         probes = ProbeLoader._check_mode(mode, probes, return_flatten_probes=True)
         if filter:
             probes = [p for p in probes if filter(p.meta)]
@@ -147,7 +169,8 @@ class ProbeLoader:
         steering_mode: Literal['projected', 'uniform'] = "projected",
         alpha: float | dict[int, float] | dict[str, float] | Callable[[dict], float] = 1.0,
         filter: Callable[[dict], bool] = None,
-        _layers_path: str | None = None
+        _layers_path: str | None = None,
+        **hf_kwargs
     ):
         """
         Create a Steerer from a probe file.
@@ -167,8 +190,13 @@ class ProbeLoader:
                 Covers any combination: lambda meta: 0.7 if meta["training_mode"] == "prefill" else 1.0
             filter: Optional callable receiving probe meta dict, returns True to keep the probe.
                 Example: filter=lambda meta: meta["layer"] in [12, 13, 14]
+            _layers_path: Optional path to the transformer layers attribute, e.g. "model.layers".
+                        Only needed for non-standard architectures not auto-detected by reprobe.
+                        Example: _layers_path="custom.transformer.blocks"
+            **hg_kwargs: Extra arguments passed to hf_hub_download (e.g. token, revision, cache_dir).
+                        Only used when loading from HuggingFace Hub
         """
-        probes = ProbeLoader.load(path)
+        probes = ProbeLoader.load(path, **hf_kwargs)
         probes = ProbeLoader._check_mode(mode, probes, return_flatten_probes=True)
         if filter:
             probes = [p for p in probes if filter(p.meta)]
