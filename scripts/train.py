@@ -10,6 +10,7 @@ import logging
 import tomllib
 from detoxify import Detoxify
 from reprobe import ProbesTrainer, Interceptor, Classifier, ActivationStore
+from generate_dataset import load_model
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s][%(levelname)s] %(message)s",
@@ -19,36 +20,148 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def ollama_violence_score(texts: list[str], model: str = "gemma3:1b", host: str = "http://localhost:11434") -> torch.Tensor:
-    scores = []
-    for text in texts:
-        prompt = f"""Score the following text on its level of violent intent, from 0.0 (completely safe) to 1.0 (explicitly violent).
-
-Return ONLY a single float between 0.0 and 1.0, nothing else.
-
-Text: {text}
-
-Score:"""
-        try:
-            response = requests.post(
-                f"{host}/api/chat",
-                json={
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "stream": False,
-                    "options": {"temperature": 0.1}
-                },
-                timeout=30
-            )
-            raw = response.json()["message"]["content"].strip()
-            score = float(raw)
-            score = max(0.0, min(1.0, score))
-        except Exception:
-            logger.warning(f"Bad answer: {raw}")
-            score = 0.0
-        scores.append(score)
+def violence_score(
+    texts: list[str],
+    model,
+    tokenizer,
+    device: torch.device,
+    batch_size: int = 32,
+) -> torch.Tensor:
+    """
+    Score a list of texts on violent intent using a local HuggingFace model.
+    Returns a Tensor[N] of floats in [0, 1].
+    Batched — call once at the end of collection, not per sample.
+    """
     
+    
+    # puis tokenize prompt normalement
+
+    scores = []
+    orig_padding_side = tokenizer.padding_side
+    tokenizer.padding_side = "left"
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i+batch_size]
+        prompts = [
+            tokenizer.apply_chat_template(
+                [
+                    {
+                        "role": "system", 
+                        "content": "You are a violence classifier. You MUST respond with ONLY a single decimal number between 0.0 and 1.0. No words, no explanation, no punctuation. Just the number."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Violence score for this text: {t}"
+                    }
+                ],
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            for t in batch_texts
+        ]
+        inputs = tokenizer(
+            prompts,
+            return_tensors="pt",
+            truncation=True,
+            max_length=2000,
+        ).to(device)
+        
+        prompt_len = inputs["input_ids"].shape[1]
+        
+        with torch.no_grad():
+            output_ids = model.generate(
+                **inputs,
+                max_new_tokens=8,
+                do_sample=False,
+                pad_token_id=tokenizer.pad_token_id
+            )
+        
+        decoded = tokenizer.batch_decode(output_ids[:, prompt_len:], skip_special_tokens=True)
+        
+        for raw in decoded:
+            try:
+                score = float(raw.strip().split()[0])
+                score = max(0.0, min(1.0, score))
+            except (ValueError, IndexError):
+                logger.warning(f"Bad answer: {raw}")
+                score = 0.0
+            scores.append(score)
+    tokenizer.padding_side = orig_padding_side
     return torch.tensor(scores)
+
+def process_data(dataset, desc):
+    items = list(dataset)
+    for i in tqdm(range(0, len(items), batch_size), desc=desc):
+        batch = items[i:i+batch_size]
+        prompts = [item["prompt"] for item in batch]
+        inputs = tokenizer(
+            prompts,
+            return_tensors="pt",
+            truncation=True,
+            padding=True,  # obligatoire pour le batch
+            max_length=max_input_tokens,
+            pad_token_id=tokenizer.pad_token_id
+        ).to(device)
+        
+        interceptor.allow_one_capture(len(batch))
+        
+        if mode == "prefill":
+            with torch.inference_mode():
+                model(**inputs)
+            
+            acts = interceptor.flush_batch()
+            labels = torch.tensor([0.0 if item["is_safe"] else 1.0 for item in batch])
+            store.append(
+                acts,
+                {"prefill": labels, "token": None}
+            )
+                
+        elif mode == "token":
+            with torch.inference_mode():
+                model.generate(**inputs, max_new_tokens=100, do_sample=False)
+            acts = interceptor.flush_batch()
+            
+            # prompt_len = inputs["input_ids"].shape[1]
+            #texts = tokenizer.batch_decode(outputs_ids[:, prompt_len:], skip_special_tokens=True)
+            # labels = [
+            #     classifier.classify([text]).squeeze().repeat(prompt_acts.shape[0])
+            #     for prompt_acts, text in zip(acts["token"], texts)
+            # ]
+            token_labels = [
+                torch.tensor(0.0 if item["is_safe"] else 1.0).repeat(prompt_acts.shape[0])
+                for item, prompt_acts in zip(batch, acts["token"])
+            ]
+            store.append(
+                acts,
+                {"prefill": None, "token": token_labels}
+            )
+        elif mode == "all":
+            with torch.inference_mode():
+                output_ids = model.generate(**inputs, max_new_tokens=100, do_sample=False)
+            prompt_len = inputs["input_ids"].shape[1]
+            texts = tokenizer.batch_decode(output_ids[:, prompt_len:], skip_special_tokens=True)
+            flushed = interceptor.flush_batch()
+            
+            interceptor.detach()
+            short_texts = [t[:200] for t in texts]
+            scores = violence_score(short_texts, model, tokenizer, device, batch_size=1)
+            interceptor.attach()
+
+            token_labels = [
+                scores[i].repeat(prompt_acts.shape[0])
+                for i, prompt_acts in enumerate(flushed["token"])
+            ]
+            
+            prefill_labels = torch.tensor([0.0 if item["is_safe"] else 1.0 for item in batch])
+            # token_labels = [
+            #     torch.tensor(0.0 if item["is_safe"] else 1.0).repeat(prompt_acts.shape[0])
+            #     for item, prompt_acts in zip(batch, flushed["token"])
+            # ]
+            
+            store.append(
+                flushed,
+                {"prefill": prefill_labels, "token": token_labels}
+            )
+
 
 if "__main__" == __name__:
     parser = argparse.ArgumentParser()
@@ -96,19 +209,19 @@ if "__main__" == __name__:
     )
     model.generation_config.pad_token_id = tokenizer.pad_token_id
     
-    logger.info("Loading classifier...")
-    detox = Detoxify('original', device=device)
-    def _normalize(out) -> torch.Tensor:
-        TOXIC_BERT_CLASSES = ['toxicity', 'severe_toxicity', 'obscene', 'threat', 'insult', 'identity_attack']
-        RELEVANT_IDX = [0, 1, 3, 4]  # toxicity, severe_toxicity, threat, insult
-        # out.logits : [batch, 6] — pas des probas, des logits bruts
-        probs = torch.sigmoid(out.logits)          # → [batch, 6] dans [0,1]
-        score = probs[:, RELEVANT_IDX].max(dim=1).values  # → [batch] scalaire par sample
-        return score.detach().cpu()
-    classifier = Classifier(detox.model, device=device, normalize_output=_normalize, tokenizer=detox.tokenizer)
+    # logger.info("Loading classifier...")
+    # detox = Detoxify('original', device=device)
+    # def _normalize(out) -> torch.Tensor:
+    #     TOXIC_BERT_CLASSES = ['toxicity', 'severe_toxicity', 'obscene', 'threat', 'insult', 'identity_attack']
+    #     RELEVANT_IDX = [0, 1, 3, 4]  # toxicity, severe_toxicity, threat, insult
+    #     # out.logits : [batch, 6] — pas des probas, des logits bruts
+    #     probs = torch.sigmoid(out.logits)          # → [batch, 6] dans [0,1]
+    #     score = probs[:, RELEVANT_IDX].max(dim=1).values  # → [batch] scalaire par sample
+    #     return score.detach().cpu()
+    # classifier = Classifier(detox.model, device=device, normalize_output=_normalize, tokenizer=detox.tokenizer)
     
     
-    logger.info("Downloading/Loading BeaverTails dataset...")
+    # logger.info("Downloading/Loading BeaverTails dataset...")
     # On charge uniquement le split train pour aller vite
     #ds = load_dataset("PKU-Alignment/BeaverTails", split="330k_train")
     dataset_path = os.path.join(dataset_dir, f"violence_dataset.pt")
@@ -141,75 +254,7 @@ if "__main__" == __name__:
     labels = {"prefill": []}
     all_texts = {"token": []}
 
-    def process_data(dataset, desc):
-        items = list(dataset)
-        for i in tqdm(range(0, len(items), batch_size), desc=desc):
-            batch = items[i:i+batch_size]
-            prompts = [item["prompt"] for item in batch]
-            inputs = tokenizer(
-                prompts,
-                return_tensors="pt",
-                truncation=True,
-                padding=True,  # obligatoire pour le batch
-                max_length=max_input_tokens,
-                pad_token_id=tokenizer.pad_token_id
-            ).to(device)
-            
-            interceptor.allow_one_capture(len(batch))
-            
-            if mode == "prefill":
-                with torch.inference_mode():
-                    model(**inputs)
-                
-                acts = interceptor.flush_batch()
-                labels = torch.tensor([0.0 if item["is_safe"] else 1.0 for item in batch])
-                store.append(
-                    acts,
-                    {"prefill": labels, "token": None}
-                )
-                    
-            elif mode == "token":
-                with torch.inference_mode():
-                    model.generate(**inputs, max_new_tokens=100, do_sample=False)
-                acts = interceptor.flush_batch()
-                
-                # prompt_len = inputs["input_ids"].shape[1]
-                #texts = tokenizer.batch_decode(outputs_ids[:, prompt_len:], skip_special_tokens=True)
-                # labels = [
-                #     classifier.classify([text]).squeeze().repeat(prompt_acts.shape[0])
-                #     for prompt_acts, text in zip(acts["token"], texts)
-                # ]
-                token_labels = [
-                    torch.tensor(0.0 if item["is_safe"] else 1.0).repeat(prompt_acts.shape[0])
-                    for item, prompt_acts in zip(batch, acts["token"])
-                ]
-                store.append(
-                    acts,
-                    {"prefill": None, "token": token_labels}
-                )
-            elif mode == "all":
-                with torch.inference_mode():
-                    output_ids = model.generate(**inputs, max_new_tokens=100, do_sample=False)
-                prompt_len = inputs["input_ids"].shape[1]
-                texts = tokenizer.batch_decode(output_ids[:, prompt_len:], skip_special_tokens=True)
-                flushed = interceptor.flush_batch()
-                
-                token_labels = [
-                    classifier.classify([text]).squeeze().repeat(prompt_acts.shape[0])
-                    for prompt_acts, text in zip(flushed["token"], texts)
-                ]
-                
-                prefill_labels = torch.tensor([0.0 if item["is_safe"] else 1.0 for item in batch])
-                token_labels = [
-                    torch.tensor(0.0 if item["is_safe"] else 1.0).repeat(prompt_acts.shape[0])
-                    for item, prompt_acts in zip(batch, acts["token"])
-                ]
-                
-                store.append(
-                    flushed,
-                    {"prefill": prefill_labels, "token": token_labels}
-                )
-
+   
     logger.info(f"Batch size set to {batch_size}")
     data = unsafe_data + safe_data
     random.shuffle(data)

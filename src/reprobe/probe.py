@@ -91,8 +91,9 @@ class ProbesTrainer():
         all_labels = torch.cat(all_labels).squeeze()
 
         probs = torch.sigmoid(all_logits)
-
-        auc = roc_auc_score(all_labels.numpy(), probs.numpy())
+        
+        binary_labels = (all_labels > 0.5).float()
+        auc = roc_auc_score(binary_labels.numpy(), probs.numpy())
 
         return auc
     
