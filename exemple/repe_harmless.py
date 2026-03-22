@@ -282,9 +282,8 @@ if __name__ == "__main__":
 
     model, tokenizer = load_llm(MODEL_ID, DEVICE)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store = collect_activations(model, tokenizer, tmpdir)
-        probe_dir = train_probes(store, MODEL_ID, tmpdir)
-        results = evaluate(model, tokenizer, probe_dir)
+    store = collect_activations(model, tokenizer, OUTPUT_DIR)
+    probe_dir = train_probes(store, MODEL_ID, OUTPUT_DIR)
+    results = evaluate(model, tokenizer, probe_dir)
 
     print_results(results)
