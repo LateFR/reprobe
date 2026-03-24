@@ -6,10 +6,10 @@
 
 **Linear probes and activation steering for transformer safety research**
 
-\*Based on the **RepE paper\***
+*Based on the **RepE paper***
 
 `reprobe` is a tool for monitoring and steering LLMs. It helps you find where "concepts" (like toxicity or bias) live in the model's activations and lets you modify them in real-time.
-.
+
 
 **Why?** I built `reprobe` to provide a practical, efficient implementation of the RepE paper. My goal was to create a tool that works with large models on normal hardware, without losing the mathematical clarity and control needed for safety research.
 
@@ -52,7 +52,7 @@ model_id = "Qwen/Qwen2.5-1.5B"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16)
 
-# 1. Load your probes and create a Steerer and Montitor
+# 1. Load your probes and create a Steerer and Monitor
 # You can load from a local path or directly from HuggingFace Hub
 
 probe_dir = "YourUsername/your-probes-repo", # Local: "path/to/probes/registry.json" or "path/to/probes.pt"
@@ -60,9 +60,9 @@ steerer = ProbeLoader.steerer(
     model,
     probe_dir,
     alpha={"prefill": 1.0, "token": 2.5}, # Steering strength
-    # We can also set an alpha per layer, or pass a callback function to set dynamycally the alpha
+    # We can also set an alpha per layer, or pass a callback function to set dynamically the alpha
     filter=lambda meta: meta["layer"] in range(12, 20) # Only steer middle layers. Optional.
-    mode="all" # beetween "prefill", "token" and "all". Must be compatible with your probes.
+    mode="all" # between "prefill", "token" and "all". Must be compatible with your probes.
 )
 
 monitor = ProbeLoader.monitor(
@@ -84,7 +84,7 @@ print(tokenizer.decode(output[0]))
 # Retrieve monitor scores
 score = monitor.score(
     strategy = "max_of_means"
-    flush_buffer = False # Flush buffer reset the internal state of the monitor. If you want to re call score() or to calculate in continue the score, put it to False to keep intact the state. You must call at least on time flush_buffer between two generation. monitor.flush_buffer() do the same thing without scoring.
+    flush_buffer = False # Flush buffer resets the internal state of the monitor. If you want to re call score() or to calculate in continue the score, put it to False to keep intact the state. You must call at least on time flush_buffer between two generation. monitor.flush_buffer() does the same thing without scoring.
 )
 score_mean_of_means = monitor.score(
     strategy = "mean_of_means"
@@ -94,7 +94,7 @@ monitor.detach()
 steerer.detach()
 
 
-# model can be recall without monitor ou steerer. While probes stays "attach", its active
+# After detach, model can be recalled without monitor or steerer. But while probes stay attached, they are active
 ```
 
 ---
@@ -143,7 +143,7 @@ for prompt in prompts:
     # Get activations for this prompt
     flushed = interceptor.flush_batch() # If you train only for prefill, "token" will be None and vice versa
 
-    # Define your labels (0.0 = safe, 1.0 = unsafe). Can be continus
+    # Define your labels (0.0 = safe, 1.0 = unsafe). Can be continuous
     # Usually provided by a classifier or dataset annotations.
     prefill_label = torch.tensor([0.0]) # Example label
     token_labels = [torch.zeros(flushed["token"][0].shape[0])]
@@ -151,7 +151,7 @@ for prompt in prompts:
     # Stream to disk incrementally
     store.append(
         acts=flushed,
-        labels={"prefill": prefill_label, "token": token_labels}  # "token" to None if you train only for prefill, and vice-verca
+        labels={"prefill": prefill_label, "token": token_labels}  # "token" to None if you train only for prefill, and vice-versa
     )
 
 interceptor.detach()
@@ -178,7 +178,7 @@ trainer.train_probes(
 
 trainer.save("outputs/probes/") # Human-readable JSON + weights
 # OR
-trainer.save("outputs/probes/", filename="probes.py", single_file=True) # All in one file, compact, usefull for export. Non human readable
+trainer.save("outputs/probes/", filename="probes.py", single_file=True) # All in one file, compact, useful for export. Non human readable
 ```
 
 ### Step 3: Monitor & Steer
@@ -271,6 +271,6 @@ pytest
 
 ## Author
 
-`reprobe` is my first open-source library. I built it because I’m passionate about AI safety and I wanted to make activation steering more accessible for everyone. I spend month on it, so I hope it's help you :)
+`reprobe` is my first open-source library. I built it because I’m passionate about AI safety and I wanted to make activation steering more accessible for everyone. I spend months on it, so I hope it help you :)
 
 Since I’m still learning, please feel free to open an issue or a PR if you find a bug or have an idea to improve the code. Every feedback is welcome!
