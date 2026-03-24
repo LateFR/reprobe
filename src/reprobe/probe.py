@@ -207,7 +207,8 @@ class ProbesTrainer():
         if not single_file:
             path = os.path.join(dir, "registry.json")
         else:
-            filename = filename or "probes.pt"
+            safe_id = self.model_id.replace("/", "_")
+            filename = filename or f"{safe_id}_probes.pt"
             path = os.path.join(dir, filename)
         
         if not os.path.exists(path) and merge:
