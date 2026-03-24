@@ -6,13 +6,12 @@
 
 **Linear probes and activation steering for transformer safety research**
 
-*Based on the **RepE paper***
+\*Based on the **RepE paper\***
 
 `reprobe` is a tool for monitoring and steering LLMs. It helps you find where "concepts" (like toxicity or bias) live in the model's activations and lets you modify them in real-time.
-. 
+.
 
 **Why?** I built `reprobe` to provide a practical, efficient implementation of the RepE paper. My goal was to create a tool that works with large models on normal hardware, without losing the mathematical clarity and control needed for safety research.
-
 
 ## Features
 
@@ -20,27 +19,25 @@ The library is designed to be highly ergonomic yet mathematically rigorous. It a
 
 - **Complete End-to-End Pipeline:** Not just a steering script. `reprobe` provides a unified workflow to capture activations, train probes, and apply them (Monitoring & Steering).
 
-- **Phase-Aware Processing (Prefill vs. Token):** Most naive implementations treat prompt processing and token generation the same way. `reprobe` allows you to train and apply distinct probes for the *prefill* phase and the *token* phase, heavily improving steering quality.
+- **Phase-Aware Processing (Prefill vs. Token):** Most naive implementations treat prompt processing and token generation the same way. `reprobe` allows you to train and apply distinct probes for the _prefill_ phase and the _token_ phase, heavily improving steering quality.
 
 - **OOM-Proof Activation Storage:** Capturing LLM activations usually blows up your RAM in seconds. `reprobe` streams activations directly to disk using an optimized `h5py` backend (`ActivationStore`), allowing you to build massive datasets on consumer hardware.
 
-- **Granular Steering Control:** Control the steering strength (`alpha`) globally, per-layer, per-phase, or even dynamically using a custom callback function. You can also choose between *projected* (recommended) and *uniform* steering.
+- **Granular Steering Control:** Control the steering strength (`alpha`) globally, per-layer, per-phase, or even dynamically using a custom callback function. You can also choose between _projected_ (recommended) and _uniform_ steering.
 
 - **Plug-and-Play with HuggingFace:** Automatically detects the architecture of modern models (Llama, Qwen, Mistral, Phi, Gemma, etc.). It uses clean PyTorch forward hooks, meaning you don't have to rewrite the model's `forward` pass—just call `model.generate()` as usual.
 
 - **Cloud-Ready Probes:** Load and share your trained `.pt` or `registry.json` probes directly from local folders or HuggingFace Hub repositories.
-
 
 ## Installation
 
 ```bash
 pip install reprobe
 ```
-*Tested on Python ≥ 3.11 and PyTorch ≥ 2.6.*
 
+_Tested on Python ≥ 3.11 and PyTorch ≥ 2.6._
 
 ## Quick Start: Monitor and/or Steering an LLM
-
 
 If you already have trained probes (locally or on the HuggingFace Hub), steering a model takes only a few lines of code. During inference, the library stays out of your way: it adapts to your workflow, not the other way around.
 
@@ -60,12 +57,12 @@ model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat1
 
 probe_dir = "YourUsername/your-probes-repo", # Local: "path/to/probes/registry.json" or "path/to/probes.pt"
 steerer = ProbeLoader.steerer(
-    model, 
+    model,
     probe_dir,
     alpha={"prefill": 1.0, "token": 2.5}, # Steering strength
-    # We can also set an alpha per layer, or pass a callback function to set dynamycally the alpha 
+    # We can also set an alpha per layer, or pass a callback function to set dynamycally the alpha
     filter=lambda meta: meta["layer"] in range(12, 20) # Only steer middle layers. Optional.
-    mode="all" # beetween "prefill", "token" and "all". Must be compatible with your probes. 
+    mode="all" # beetween "prefill", "token" and "all". Must be compatible with your probes.
 )
 
 monitor = ProbeLoader.monitor(
@@ -126,10 +123,10 @@ prompts = ["I want to help people.", "I want to hurt people."]
 
 # Initialize persistent HDF5 store
 store = ActivationStore(
-    path="outputs/acts/store.h5", 
-    N=len(prompts), 
-    mode="all", 
-    start_layer=10, 
+    path="outputs/acts/store.h5",
+    N=len(prompts),
+    mode="all",
+    start_layer=10,
     end_layer=model.config.num_hidden_layers
 )
 
@@ -149,7 +146,7 @@ for prompt in prompts:
     # Define your labels (0.0 = safe, 1.0 = unsafe). Can be continus
     # Usually provided by a classifier or dataset annotations.
     prefill_label = torch.tensor([0.0]) # Example label
-    token_labels = [torch.zeros(flushed["token"][0].shape[0])] 
+    token_labels = [torch.zeros(flushed["token"][0].shape[0])]
 
     # Stream to disk incrementally
     store.append(
@@ -179,9 +176,9 @@ trainer.train_probes(
 )
 
 
-trainer.save("outputs/probes/registry.json") # Human-readable JSON + weights
+trainer.save("outputs/probes/") # Human-readable JSON + weights
 # OR
-trainer.save("outputs/probes/probes.pt", one_file=True) # All in one file, compact, usefull for export. Non human readable
+trainer.save("outputs/probes/", filename="probes.py", single_file=True) # All in one file, compact, usefull for export. Non human readable
 ```
 
 ### Step 3: Monitor & Steer
@@ -223,23 +220,28 @@ monitor.detach()
 ## Key Concepts & Parameters
 
 ### Training & Capturing Modes
-The `mode` parameter (`"prefill"`, `"token"`, or `"all"`) is everywhere in `reprobe`. 
-* **`prefill`**: Operates only on the initial prompt processing pass.
-* **`token`**: Operates only on the autoregressive generation pass (token by token).
-* **`all`**: Captures/Trains both. Highly recommended, as separating these distributions yields much cleaner steering.
+
+The `mode` parameter (`"prefill"`, `"token"`, or `"all"`) is everywhere in `reprobe`.
+
+- **`prefill`**: Operates only on the initial prompt processing pass.
+- **`token`**: Operates only on the autoregressive generation pass (token by token).
+- **`all`**: Captures/Trains both. Highly recommended, as separating these distributions yields much cleaner steering.
 
 ### Steering Parameters (`ProbeLoader.steerer`)
-| Parameter | What it does |
-|---|---|
-| `alpha` | The steering strength. Accepts a `float` (global), a `dict[int, float]` (per layer), a `dict[str, float]` (per mode, e.g., `{"prefill": 0.7, "token": 1.2}`), or a custom `Callable[[dict], float]` receiving probe metadata. Higher = more aggressive suppression, with a higher risk of degrading neutral outputs. |
-| `filter` | `Callable[[dict], bool]`. Lets you select a subset of probes at load time without modifying saved files. Excellent for layer-ablation experiments. |
-| `steering_mode` | `"projected"` (default) subtracts only the component of the residual stream along the probe direction. `"uniform"` subtracts the full direction vector. Projected is highly recommended as it preserves capabilities better. |
+
+| Parameter       | What it does                                                                                                                                                                                                                                                                                                         |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alpha`         | The steering strength. Accepts a `float` (global), a `dict[int, float]` (per layer), a `dict[str, float]` (per mode, e.g., `{"prefill": 0.7, "token": 1.2}`), or a custom `Callable[[dict], float]` receiving probe metadata. Higher = more aggressive suppression, with a higher risk of degrading neutral outputs. |
+| `filter`        | `Callable[[dict], bool]`. Lets you select a subset of probes at load time without modifying saved files. Excellent for layer-ablation experiments.                                                                                                                                                                   |
+| `steering_mode` | `"projected"` (default) subtracts only the component of the residual stream along the probe direction. `"uniform"` subtracts the full direction vector. Projected is highly recommended as it preserves capabilities better.                                                                                         |
 
 ### Monitor Strategies (`Monitor.score`)
+
 How to aggregate per-layer, per-token probabilities into a single score:
-* `"max_of_means"` (default): Max over tokens of the mean across layers.
-* `"mean_of_means"`: Global average.
-* `"max_absolute"`: Single highest probability seen across any layer at any token step.
+
+- `"max_of_means"` (default): Max over tokens of the mean across layers.
+- `"mean_of_means"`: Global average.
+- `"max_absolute"`: Single highest probability seen across any layer at any token step.
 
 ---
 
@@ -249,6 +251,7 @@ Layer auto-detection works out-of-the-box for:
 `Llama`, `Qwen`, `Mistral`, `Phi-3`, `Gemma`, `GPT-2`, `BLOOM`, `GPT-NeoX`, `Pythia`, and `OPT`.
 
 For non-standard architectures, simply pass the path to the Transformer layers manually:
+
 ```python
 Interceptor(model, _layers_path="custom.transformer.blocks")
 ```
@@ -265,7 +268,6 @@ cd reprobe
 pip install -e ".[dev]"
 pytest
 ```
-
 
 ## Author
 

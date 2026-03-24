@@ -144,7 +144,53 @@ class ProbesTrainer():
                 if show_stats:
                     tqdm.tqdm.write(f"{mode} | Layer {layer_idx} | ROC-AUC: {acc:.3f}")
     
-    def save(self, dir: str, one_file: bool = False, merge = False):
+    def save(
+        self,
+        dir: str,
+        single_file: bool = False,
+        filename: str | None = None,
+        merge: bool = False
+    ):
+        """
+        Save trained probes to disk.
+
+        Parameters
+        ----------
+        dir : str
+            Target directory where probes will be saved. Always treated as a directory.
+
+        single_file : bool, default=False
+            If True, all probes are stored in a single file (default: "probes.pt").
+            If False, probes are saved as multiple files (one per layer) alongside
+            a "registry.json" file that indexes them.
+
+        filename : str | None, default=None
+            Name of the output file when `single_file=True`.
+            Ignored if `single_file=False`.
+            Defaults to "probes.pt".
+
+        merge : bool, default=False
+            If True, merges current probes with an existing save:
+            - In multi-file mode: loads existing "registry.json" and updates it.
+            - In single-file mode: loads the existing `.pt` file and updates it.
+            If no existing file is found, a warning is emitted and a new file is created.
+
+        Behavior
+        --------
+        - Requires `train_probes` to be called beforehand.
+        - In multi-file mode:
+            * Saves each probe as "{mode}_layer_{layer}.pt"
+            * Writes metadata and file references into "registry.json"
+        - In single-file mode:
+            * Stores all probes and metadata in a single `.pt` file
+
+        Notes
+        -----
+        - `dir` must be a directory; passing a file path will lead to unintended behavior.
+        - In multi-file mode, probe filenames are generated automatically and cannot be customized.
+        - The registry contains metadata (model_id, layers, AUC, etc.) required for reloading.
+        """
+            
         if not self.training_mode:
             raise RuntimeError('Please call "train_probes" before save.')
         os.makedirs(dir, exist_ok=True)
@@ -158,22 +204,23 @@ class ProbesTrainer():
                 "token": {}
             }
             }
-        if not one_file:
+        if not single_file:
             path = os.path.join(dir, "registry.json")
         else:
-            path = os.path.join(dir, f"probes.pt")
+            filename = filename or "probes.pt"
+            path = os.path.join(dir, filename)
         
         if not os.path.exists(path) and merge:
             logger.warning(f"No probe file existing in {dir}")
         elif merge:
-            if not one_file:
+            if not single_file:
                 with open(path, "r") as f:
                     registry = json.load(f)
             else:
                 registry = torch.load(path)
         modes_to_save = ["prefill", "token"] if self.training_mode == "all" else [self.training_mode]
         for mode in modes_to_save:
-            if not one_file:
+            if not single_file:
                 for layer, probe in self.probes[mode].items():
                     filename = f"{mode}_layer_{layer}.pt"
                     probe.save(os.path.join(dir, filename))
@@ -184,7 +231,7 @@ class ProbesTrainer():
                 
         
         # Save
-        if not one_file:
+        if not single_file:
             with open(path, "w") as f:
                 json.dump(registry, f, indent=2)
         else:

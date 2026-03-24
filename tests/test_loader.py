@@ -29,7 +29,7 @@ def test_probe_single_mode():
         trainer.train_probes(store, ["test"], epochs=1, training_mode=mode)
         probes = trainer.probes
 
-        trainer.save(tmpdir, one_file=True)
+        trainer.save(tmpdir, single_file=True)
         loaded = ProbeLoader.from_file(os.path.join(tmpdir, f"{model_id}_probes.pt"))
         for layer in probes[mode]:
             compare_probes(probes[mode][layer], loaded[mode][layer])
@@ -62,7 +62,7 @@ def test_probe_all_mode():
         assert len(probes["prefill"]) > 0, "Aucune probe prefill entraînée"
         assert len(probes["token"]) > 0, "Aucune probe token entraînée"
 
-        trainer.save(tmpdir, one_file=True)
+        trainer.save(tmpdir, single_file=True)
         loaded = ProbeLoader.from_file(os.path.join(tmpdir, f"{model_id}_probes.pt"))
         
         for mode in ["prefill", "token"]:

@@ -186,7 +186,7 @@ def train_probes(store: ActivationStore, model_id: str, tmpdir: str) -> str:
     )
 
     probe_dir = os.path.join(tmpdir, "probes")
-    trainer.save(probe_dir, one_file = True)
+    trainer.save(probe_dir, single_file = True)
     print(f"  Probes saved to {probe_dir}")
     return probe_dir
 
