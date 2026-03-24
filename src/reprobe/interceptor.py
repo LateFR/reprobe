@@ -118,3 +118,9 @@ class Interceptor(Hook):
         self._capture_next = False
         
         return result
+    
+    def attach(self):
+        self._resolve_layers_if_none()
+        if self.end_layer is None:
+            self.end_layer = len(self._layers)
+        return super().attach()
