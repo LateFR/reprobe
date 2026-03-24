@@ -93,7 +93,7 @@ class ProbeLoader:
             if not files:
                 raise ValueError(f"No .pt file found in HuggingFace repo '{path}'.")
             
-            path = hf_hub_download(path, fliename=files[0], **hf_kwargs)
+            path = hf_hub_download(path, filename=files[0], **hf_kwargs)
         except:
             raise ValueError(f"Path doesn't exist and ins't available on hugging face: '{path}'.")
         return ProbeLoader.load(path)
