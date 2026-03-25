@@ -6,7 +6,7 @@
 
 **Linear probes and activation steering for transformer safety research**
 
-*Inspired by the **RepE paper***
+*Built on ideas from [Representation Engineering (2023)](https://arxiv.org/abs/2310.01405)*
 
 `reprobe` is a tool for monitoring and steering LLMs. It helps you find where "concepts" (like toxicity or bias) live in the model's activations and lets you modify them in real-time.
 
