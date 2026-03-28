@@ -1,8 +1,9 @@
 # reprobe
 
-[![PyPI version](https://badge.fury.io/py/reprobe.svg)](https://badge.fury.io/py/reprobe)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/release/python-3110/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.6+-EE4C2C.svg)](https://pytorch.org/)
+[![PyPI version](https://img.shields.io/pypi/v/reprobe?color=green)](https://pypi.org/project/reprobe/)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/reprobe?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BRIGHTGREEN&left_text=downloads)](https://pepy.tech/projects/reprobe)
+[![GitHub stars](https://img.shields.io/github/stars/levashi/reprobe?color=%23FFC107&label=stars&logo=github&style=flat)](https://github.com/levashi/reprobe/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 **Linear probes and activation steering for transformer safety research**
 
